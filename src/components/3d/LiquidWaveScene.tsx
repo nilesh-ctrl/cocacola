@@ -3,6 +3,7 @@
 import { useRef, useMemo } from 'react';
 import * as THREE from 'three';
 import { Canvas, useFrame } from '@react-three/fiber';
+import { getQualitySettings } from '@/lib/performance';
 
 /* ===========================================================
    LIQUID WAVE SIMULATION
@@ -59,11 +60,17 @@ const fragmentShader = `
 `;
 
 export function LiquidWaveScene() {
+  const quality = useMemo(() => getQualitySettings(), []);
   return (
     <Canvas
       camera={{ position: [0, 0, 4.5], fov: 45 }}
-      gl={{ antialias: true, alpha: true }}
-      dpr={[1, 2]}
+      gl={{
+        antialias: quality.antialias,
+        alpha: true,
+        powerPreference: quality.tier === 'low' ? 'low-power' : 'high-performance',
+        stencil: false,
+      }}
+      dpr={quality.dpr}
     >
       <ambientLight intensity={0.3} />
       <directionalLight position={[5, 5, 5]} intensity={1.0} color="#ffffff" />
@@ -75,6 +82,9 @@ export function LiquidWaveScene() {
 
 function LiquidPlane() {
   const matRef = useRef<THREE.ShaderMaterial>(null);
+  const quality = useMemo(() => getQualitySettings(), []);
+  // Reduce plane subdivisions on low-end (128² = 16k verts → 64² = 4k)
+  const segs = quality.tier === 'low' ? 64 : quality.tier === 'mid' ? 96 : 128;
   const uniforms = useMemo(
     () => ({
       uTime: { value: 0 },
@@ -92,7 +102,7 @@ function LiquidPlane() {
 
   return (
     <mesh rotation={[-Math.PI / 2.5, 0, 0]} position={[0, 0, 0]}>
-      <planeGeometry args={[10, 10, 128, 128]} />
+      <planeGeometry args={[10, 10, segs, segs]} />
       <shaderMaterial
         ref={matRef}
         uniforms={uniforms}

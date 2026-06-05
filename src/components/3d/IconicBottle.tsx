@@ -6,6 +6,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Environment, ContactShadows } from '@react-three/drei';
 import { EffectComposer, Bloom, Vignette, ChromaticAberration } from '@react-three/postprocessing';
 import { BlendFunction } from 'postprocessing';
+import { getQualitySettings } from '@/lib/performance';
 
 /* ============================================================
    ICONIC COCA-COLA CONTOUR BOTTLE
@@ -92,6 +93,7 @@ function BottleLabel() {
 
 /* Inner liquid — slightly inset from glass */
 function Liquid() {
+  const quality = useMemo(() => getQualitySettings(), []);
   const liquidPoints = useMemo(
     () =>
       contourPoints
@@ -100,8 +102,8 @@ function Liquid() {
     []
   );
   const liquidGeo = useMemo(
-    () => new THREE.LatheGeometry(liquidPoints, 96),
-    [liquidPoints]
+    () => new THREE.LatheGeometry(liquidPoints, quality.geometrySegments),
+    [liquidPoints, quality.geometrySegments]
   );
   return (
     <mesh geometry={liquidGeo}>
@@ -109,13 +111,13 @@ function Liquid() {
         color="#1a0000"
         metalness={0}
         roughness={0.05}
-        transmission={0.92}
+        transmission={quality.transmission ? 0.92 : 0}
         thickness={2.5}
         ior={1.36}
         attenuationColor={new THREE.Color('#0a0000')}
         attenuationDistance={0.25}
         envMapIntensity={0.5}
-        clearcoat={0.8}
+        clearcoat={quality.transmission ? 0.8 : 0.3}
         side={THREE.DoubleSide}
       />
     </mesh>
@@ -328,8 +330,12 @@ function ReflectiveFloor() {
 /* The full bottle composition (inside Canvas) */
 function BottleComposition({ pointer }: { pointer: { x: number; y: number } }) {
   const groupRef = useRef<THREE.Group>(null);
+  const quality = useMemo(() => getQualitySettings(), []);
   const contour = useMemo(buildContourLathe, []);
-  const bodyGeo = useMemo(() => new THREE.LatheGeometry(contour, 96), [contour]);
+  const bodyGeo = useMemo(
+    () => new THREE.LatheGeometry(contour, quality.geometrySegments),
+    [contour, quality.geometrySegments]
+  );
 
   useFrame((state) => {
     if (!groupRef.current) return;
@@ -345,18 +351,18 @@ function BottleComposition({ pointer }: { pointer: { x: number; y: number } }) {
     <>
       <BottleCap />
       {/* The glass body */}
-      <mesh geometry={bodyGeo} castShadow>
+      <mesh geometry={bodyGeo} castShadow={quality.shadows}>
         <meshPhysicalMaterial
           color="#5a0008"
           metalness={0}
           roughness={0.06}
-          transmission={0.85}
+          transmission={quality.transmission ? 0.85 : 0}
           thickness={1.0}
           ior={1.5}
           attenuationColor={new THREE.Color('#3a0005')}
           attenuationDistance={0.45}
           envMapIntensity={1.8}
-          clearcoat={1}
+          clearcoat={quality.transmission ? 1 : 0.4}
           clearcoatRoughness={0.04}
           side={THREE.DoubleSide}
           transparent
@@ -365,8 +371,8 @@ function BottleComposition({ pointer }: { pointer: { x: number; y: number } }) {
       </mesh>
       <Liquid />
       <BottleLabel />
-      <Carbonation count={180} />
-      <Condensation count={320} />
+      <Carbonation count={Math.floor(180 * quality.particlesMultiplier)} />
+      <Condensation count={Math.floor(320 * quality.particlesMultiplier)} />
       <Vapor />
     </>
   );
@@ -470,6 +476,8 @@ function ProceduralEnv() {
 
 /* Scene with camera + lights + bottle + floor + post */
 function HeroBottleScene({ pointer }: { pointer: { x: number; y: number } }) {
+  const quality = useMemo(() => getQualitySettings(), []);
+
   return (
     <>
       <color attach="background" args={['#050505']} />
@@ -483,7 +491,7 @@ function HeroBottleScene({ pointer }: { pointer: { x: number; y: number } }) {
         position={[4, 6, 4]}
         intensity={1.6}
         color="#fff0d8"
-        castShadow
+        castShadow={quality.shadows}
       />
       {/* Red rim light */}
       <directionalLight position={[-4, 2, -3]} intensity={1.2} color="#ff2030" />
@@ -499,7 +507,7 @@ function HeroBottleScene({ pointer }: { pointer: { x: number; y: number } }) {
         intensity={1.5}
         color="#ffffff"
         distance={15}
-        castShadow
+        castShadow={quality.shadows}
       />
 
       <ReflectiveFloor />
@@ -509,29 +517,58 @@ function HeroBottleScene({ pointer }: { pointer: { x: number; y: number } }) {
         <BottleComposition pointer={pointer} />
       </group>
 
-      <ContactShadows
-        position={[0, -1.6, 0]}
-        opacity={0.6}
-        scale={6}
-        blur={2.5}
-        far={3}
-        color="#000000"
-      />
+      {quality.shadows && (
+        <ContactShadows
+          position={[0, -1.6, 0]}
+          opacity={0.6}
+          scale={6}
+          blur={2.5}
+          far={3}
+          color="#000000"
+        />
+      )}
 
-      <EffectComposer multisampling={4}>
+      {quality.postprocessing ? (
+        <EffectComposer multisampling={quality.antialias ? 4 : 0}>
+          <PostEffects
+            bloom={quality.enableBloom}
+            chromatic={quality.enableChromatic}
+            vignette={quality.enableVignette}
+          />
+        </EffectComposer>
+      ) : null}
+    </>
+  );
+}
+
+/* Inner component to avoid the conditional Element type issue */
+function PostEffects({
+  bloom,
+  chromatic,
+  vignette,
+}: {
+  bloom: boolean;
+  chromatic: boolean;
+  vignette: boolean;
+}) {
+  return (
+    <>
+      {bloom ? (
         <Bloom
           intensity={0.5}
           luminanceThreshold={0.7}
           luminanceSmoothing={0.6}
           mipmapBlur
         />
+      ) : null}
+      {chromatic ? (
         <ChromaticAberration
           offset={new THREE.Vector2(0.0005, 0.0005)}
           radialModulation={false}
           modulationOffset={0.5}
         />
-        <Vignette eskil={false} offset={0.3} darkness={0.6} />
-      </EffectComposer>
+      ) : null}
+      {vignette ? <Vignette eskil={false} offset={0.3} darkness={0.6} /> : null}
     </>
   );
 }
@@ -542,17 +579,20 @@ export function IconicBottle({
 }: {
   pointer?: { x: number; y: number };
 }) {
+  const quality = useMemo(() => getQualitySettings(), []);
   return (
     <Canvas
       camera={{ position: [0, 0.1, 4.2], fov: 28 }}
       gl={{
-        antialias: true,
+        antialias: quality.antialias,
         alpha: true,
-        powerPreference: 'high-performance',
+        powerPreference: quality.tier === 'low' ? 'low-power' : 'high-performance',
+        stencil: false,
+        depth: true,
       }}
-      dpr={[1, 2]}
+      dpr={quality.dpr}
       style={{ background: 'transparent' }}
-      shadows
+      shadows={quality.shadows}
     >
       <Suspense fallback={null}>
         <HeroBottleScene pointer={pointer} />

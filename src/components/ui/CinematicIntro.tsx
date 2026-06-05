@@ -6,6 +6,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { EffectComposer, Bloom, DepthOfField, Vignette, Noise, ChromaticAberration } from '@react-three/postprocessing';
 import { BlendFunction, KernelSize } from 'postprocessing';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getQualitySettings } from '@/lib/performance';
 
 /* ============================================================
    CINEMATIC INTRO — 5-PHASE APPLE-LAUNCH STYLE REVEAL
@@ -33,6 +34,7 @@ export function CinematicIntro({ onComplete }: { onComplete: () => void }) {
   const [phase, setPhase] = useState<Phase>(1);
   const [temp, setTemp] = useState(20);
   const [progress, setProgress] = useState(0);
+  const quality = useMemo(() => getQualitySettings(), []);
 
   // Master timeline
   useEffect(() => {
@@ -80,13 +82,14 @@ export function CinematicIntro({ onComplete }: { onComplete: () => void }) {
             <Canvas
               camera={{ position: [0, 0, 4], fov: 28 }}
               gl={{
-                antialias: true,
+                antialias: quality.antialias,
                 alpha: false,
-                powerPreference: 'high-performance',
+                powerPreference: quality.tier === 'low' ? 'low-power' : 'high-performance',
                 toneMapping: THREE.ACESFilmicToneMapping,
                 toneMappingExposure: 1.0,
+                stencil: false,
               }}
-              dpr={[1, 2]}
+              dpr={quality.dpr}
             >
               <color attach="background" args={['#000000']} />
               <Suspense fallback={null}>
@@ -366,8 +369,9 @@ function Bottle({ phase, temp }: { phase: Phase; temp: number }) {
   }, []);
 
   // Condensation droplets - grow with cooling
+  const quality = useMemo(() => getQualitySettings(), []);
   const droplets = useMemo(() => {
-    const count = 400;
+    const count = Math.floor(400 * quality.particlesMultiplier);
     const data: { theta: number; y: number; scale: number; speed: number; phase: number }[] = [];
     for (let i = 0; i < count; i++) {
       data.push({
@@ -608,7 +612,8 @@ function VolumetricBeam({ phase }: { phase: Phase }) {
    ============================================================ */
 function Mist({ phase }: { phase: Phase }) {
   const ref = useRef<THREE.Points>(null);
-  const count = 400;
+  const quality = useMemo(() => getQualitySettings(), []);
+  const count = Math.floor(400 * quality.particlesMultiplier);
   const data = useMemo(() => {
     const positions = new Float32Array(count * 3);
     const offsets = new Float32Array(count);

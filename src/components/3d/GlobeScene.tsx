@@ -3,16 +3,23 @@
 import { useRef, useMemo, useLayoutEffect } from 'react';
 import * as THREE from 'three';
 import { Canvas, useFrame } from '@react-three/fiber';
+import { getQualitySettings } from '@/lib/performance';
 
 /* ===========================================================
    INTERACTIVE 3D GLOBE WITH LIGHT TRAILS
    =========================================================== */
 export function GlobeScene() {
+  const quality = useMemo(() => getQualitySettings(), []);
   return (
     <Canvas
       camera={{ position: [0, 0, 4.5], fov: 40 }}
-      gl={{ antialias: true, alpha: true }}
-      dpr={[1, 2]}
+      gl={{
+        antialias: quality.antialias,
+        alpha: true,
+        powerPreference: quality.tier === 'low' ? 'low-power' : 'high-performance',
+        stencil: false,
+      }}
+      dpr={quality.dpr}
     >
       <ambientLight intensity={0.3} />
       <directionalLight position={[5, 5, 5]} intensity={1.2} color="#ffffff" />
@@ -28,6 +35,8 @@ export function GlobeScene() {
 
 function Globe() {
   const ref = useRef<THREE.Mesh>(null);
+  const quality = useMemo(() => getQualitySettings(), []);
+  const pointCount = Math.floor(200 * quality.particlesMultiplier);
 
   // Generate dotted land masses as InstancedMesh
   const landPoints = useMemo(() => {
@@ -42,7 +51,7 @@ function Globe() {
       { c: [0.9, -0.4], w: 0.4, h: 0.2 }, // Australia
     ];
     clusters.forEach((cl) => {
-      for (let i = 0; i < 200; i++) {
+      for (let i = 0; i < pointCount; i++) {
         const x = (Math.random() - 0.5) * cl.w;
         const y = (Math.random() - 0.5) * cl.h;
         const z = (Math.random() - 0.5) * 0.2;
@@ -55,7 +64,7 @@ function Globe() {
       }
     });
     return arr;
-  }, []);
+  }, [pointCount]);
 
   const instancedRef = useRef<THREE.InstancedMesh>(null);
   const dummy = useMemo(() => new THREE.Object3D(), []);
@@ -84,7 +93,7 @@ function Globe() {
     <group>
       {/* Solid sphere base */}
       <mesh ref={ref}>
-        <sphereGeometry args={[1.5, 64, 64]} />
+        <sphereGeometry args={[1.5, quality.geometrySegments, quality.geometrySegments]} />
         <meshStandardMaterial
           color="#0a0a14"
           metalness={0.4}
@@ -95,7 +104,7 @@ function Globe() {
       </mesh>
       {/* Glowing wireframe */}
       <mesh>
-        <sphereGeometry args={[1.52, 32, 16]} />
+        <sphereGeometry args={[1.52, 16, 8]} />
         <meshBasicMaterial color="#ff2030" wireframe transparent opacity={0.15} />
       </mesh>
       {/* Dotted continents */}
@@ -108,7 +117,7 @@ function Globe() {
       </instancedMesh>
       {/* Equator ring */}
       <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[1.55, 1.58, 64]} />
+        <ringGeometry args={[1.55, 1.58, 32]} />
         <meshBasicMaterial color="#ff2030" transparent opacity={0.4} side={THREE.DoubleSide} />
       </mesh>
     </group>
@@ -116,9 +125,10 @@ function Globe() {
 }
 
 function Atmosphere() {
+  const quality = useMemo(() => getQualitySettings(), []);
   return (
     <mesh>
-      <sphereGeometry args={[1.7, 32, 32]} />
+      <sphereGeometry args={[1.7, 16, 16]} />
       <shaderMaterial
         transparent
         side={THREE.BackSide}

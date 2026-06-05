@@ -4,6 +4,7 @@ import { useRef, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Float } from '@react-three/drei';
+import { getQualitySettings } from '@/lib/performance';
 
 /* A can is a tall cylinder with a custom label texture */
 type CanFlavor = {
@@ -69,11 +70,17 @@ function makeCanTexture(flavor: CanFlavor) {
 }
 
 export function CanScene({ flavorIndex = 0 }: { flavorIndex?: number }) {
+  const quality = useMemo(() => getQualitySettings(), []);
   return (
     <Canvas
       camera={{ position: [0, 0, 3.5], fov: 30 }}
-      gl={{ antialias: true, alpha: true }}
-      dpr={[1, 2]}
+      gl={{
+        antialias: quality.antialias,
+        alpha: true,
+        powerPreference: quality.tier === 'low' ? 'low-power' : 'high-performance',
+        stencil: false,
+      }}
+      dpr={quality.dpr}
     >
       <ambientLight intensity={0.5} />
       <directionalLight position={[5, 5, 5]} intensity={1.4} color="#ffffff" />
@@ -89,6 +96,8 @@ export function CanScene({ flavorIndex = 0 }: { flavorIndex?: number }) {
 function Can({ flavor }: { flavor: CanFlavor }) {
   const ref = useRef<THREE.Group>(null);
   const tex = useMemo(() => makeCanTexture(flavor), [flavor]);
+  const quality = useMemo(() => getQualitySettings(), []);
+  const segs = quality.geometrySegments;
 
   useFrame((s) => {
     if (ref.current) {
@@ -100,7 +109,7 @@ function Can({ flavor }: { flavor: CanFlavor }) {
     <group ref={ref} scale={0.7}>
       {/* body */}
       <mesh>
-        <cylinderGeometry args={[0.6, 0.6, 1.8, 64, 1, true]} />
+        <cylinderGeometry args={[0.6, 0.6, 1.8, segs, 1, true]} />
         <meshStandardMaterial
           map={tex}
           metalness={0.85}
@@ -110,23 +119,23 @@ function Can({ flavor }: { flavor: CanFlavor }) {
       </mesh>
       {/* top */}
       <mesh position={[0, 0.9, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.6, 64]} />
+        <circleGeometry args={[0.6, segs]} />
         <meshStandardMaterial color="#aaaaaa" metalness={1} roughness={0.3} />
       </mesh>
       {/* bottom */}
       <mesh position={[0, -0.9, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.6, 64]} />
+        <circleGeometry args={[0.6, segs]} />
         <meshStandardMaterial color="#888888" metalness={1} roughness={0.4} />
       </mesh>
       {/* top rim */}
       <mesh position={[0, 0.91, 0]}>
-        <torusGeometry args={[0.6, 0.02, 8, 64]} />
+        <torusGeometry args={[0.6, 0.02, 8, segs]} />
         <meshStandardMaterial color="#888" metalness={1} roughness={0.2} />
       </mesh>
       {/* pull tab */}
       <group position={[0, 0.92, 0.1]}>
         <mesh>
-          <ringGeometry args={[0.06, 0.12, 16]} />
+          <ringGeometry args={[0.06, 0.12, Math.max(8, Math.floor(segs / 4))]} />
           <meshStandardMaterial color="#bbbbbb" metalness={1} roughness={0.2} side={THREE.DoubleSide} />
         </mesh>
         <mesh position={[0.18, 0, 0]}>
