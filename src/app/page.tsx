@@ -3,8 +3,6 @@
 import { useState, useEffect } from 'react';
 import { CinematicIntro } from '@/components/ui/CinematicIntro';
 import { Cursor } from '@/components/ui/Cursor';
-import { FloatingNav } from '@/components/ui/FloatingNav';
-import { QualityToggle } from '@/components/ui/QualityToggle';
 import { Hero } from '@/components/sections/Hero';
 import { MarqueeBand } from '@/components/sections/MarqueeBand';
 import { Legacy } from '@/components/sections/Legacy';
@@ -28,8 +26,6 @@ export default function Home() {
         <CinematicIntro onComplete={() => setIntroDone(true)} />
       )}
       <Cursor />
-      <FloatingNav />
-      <QualityToggle />
       <Hero />
       <MarqueeBand />
       <Legacy />

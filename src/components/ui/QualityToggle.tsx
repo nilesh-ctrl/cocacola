@@ -16,8 +16,8 @@ export function QualityToggle() {
   }, []);
 
   if (!tier) return null;
-  // Only show on low-end devices by default; user can hide via click
-  if (tier !== 'low') return null;
+  // Never expose to users - internal optimizations only
+  return null;
 
   const change = (newTier: QualityTier | null) => {
     setQualityOverride(newTier);

@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState, useMemo, Suspense } from 'react';
 import * as THREE from 'three';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { EffectComposer, Bloom, DepthOfField, Vignette, Noise, ChromaticAberration } from '@react-three/postprocessing';
-import { BlendFunction, KernelSize } from 'postprocessing';
+import { EffectComposer, Bloom, Vignette, ChromaticAberration } from '@react-three/postprocessing';
+import { KernelSize } from 'postprocessing';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getQualitySettings } from '@/lib/performance';
+import { getSharedEnvMap } from '@/lib/envMap';
 
 /* ============================================================
    CINEMATIC INTRO — 5-PHASE APPLE-LAUNCH STYLE REVEAL
@@ -111,32 +112,52 @@ export function CinematicIntro({ onComplete }: { onComplete: () => void }) {
 }
 
 /* ============================================================
-   POST-PROCESSING — Bloom, DOF, Vignette, Chromatic Aberration
+   POST-PROCESSING — Bloom + Vignette only (DOF removed - too expensive)
    ============================================================ */
 function PostFX({ phase }: { phase: Phase }) {
-  // DOF intensifies in phase 1, eases in phase 4
-  const focal = phase === 1 ? 0.05 : phase === 4 ? 0.12 : 0.08;
-  const bokeh = phase === 1 ? 0.025 : 0.012;
-  const bloomIntensity = phase === 3 || phase === 4 ? 1.4 : phase === 1 ? 0.4 : 0.9;
+  const quality = useMemo(() => getQualitySettings(), []);
+  const phaseNum = typeof phase === 'number' ? phase : 5;
+  const bloomIntensity = phaseNum === 3 || phaseNum === 4 ? 1.4 : phaseNum === 1 ? 0.4 : 0.9;
+
+  // On low-end, ONLY show bloom + vignette (the cinematic essentials)
+  // Skip chromatic aberration (very subtle) - saves a GPU pass
+  if (!quality.postprocessing) {
+    return null;
+  }
 
   return (
-    <EffectComposer multisampling={0}>
-      <DepthOfField focusDistance={focal} focalLength={bokeh} bokehScale={4} />
-      <Bloom
-        intensity={bloomIntensity}
-        luminanceThreshold={0.6}
-        luminanceSmoothing={0.9}
-        mipmapBlur
-        kernelSize={KernelSize.LARGE}
+    <EffectComposer multisampling={quality.antialias ? 2 : 0}>
+      <PostFXPasses
+        bloom={quality.enableBloom}
+        vignette={quality.enableVignette}
+        bloomIntensity={bloomIntensity}
       />
-      <ChromaticAberration
-        offset={new THREE.Vector2(0.0008, 0.0008)}
-        radialModulation={false}
-        modulationOffset={0.5}
-      />
-      <Noise opacity={0.04} blendFunction={BlendFunction.SOFT_LIGHT} />
-      <Vignette eskil={false} offset={0.15} darkness={0.85} />
     </EffectComposer>
+  );
+}
+
+function PostFXPasses({
+  bloom,
+  vignette,
+  bloomIntensity,
+}: {
+  bloom: boolean;
+  vignette: boolean;
+  bloomIntensity: number;
+}) {
+  return (
+    <>
+      {bloom ? (
+        <Bloom
+          intensity={bloomIntensity}
+          luminanceThreshold={0.6}
+          luminanceSmoothing={0.9}
+          mipmapBlur
+          kernelSize={KernelSize.LARGE}
+        />
+      ) : null}
+      {vignette ? <Vignette eskil={false} offset={0.15} darkness={0.85} /> : null}
+    </>
   );
 }
 
@@ -256,7 +277,7 @@ function LightingRig({ phase }: { phase: Phase }) {
 
   return (
     <>
-      <ambientLight intensity={0.04} color="#ffffff" />
+      <ambientLight intensity={0.06} color="#ffffff" />
       <directionalLight
         ref={keyRef}
         position={[3, 4, 3]}
@@ -281,7 +302,6 @@ function LightingRig({ phase }: { phase: Phase }) {
         color="#88aaff"
         distance={8}
       />
-      <pointLight position={[0, -2, 3]} intensity={0.3} color="#ff4040" distance={6} />
     </>
   );
 }
@@ -302,53 +322,23 @@ function Bottle({ phase, temp }: { phase: Phase; temp: number }) {
     ].map(([x, y]) => new THREE.Vector2(x, y));
   }, []);
 
-  const bodyGeo = useMemo(() => new THREE.LatheGeometry(contourPoints, 96), [contourPoints]);
+  const quality = useMemo(() => getQualitySettings(), []);
+  const bodyGeo = useMemo(
+    () => new THREE.LatheGeometry(contourPoints, quality.geometrySegments),
+    [contourPoints, quality.geometrySegments]
+  );
   const liquidGeo = useMemo(
-    () => new THREE.LatheGeometry(contourPoints.map((p) => new THREE.Vector2(p.x * 0.93, p.y * 0.96)), 96),
-    [contourPoints]
+    () =>
+      new THREE.LatheGeometry(
+        contourPoints.map((p) => new THREE.Vector2(p.x * 0.93, p.y * 0.96)),
+        quality.geometrySegments
+      ),
+    [contourPoints, quality.geometrySegments]
   );
 
-  // Procedural environment for reflections
+  // Procedural environment for reflections - SHARED across scenes
   const { gl } = useThree();
-  const envTex = useMemo(() => {
-    const pmrem = new THREE.PMREMGenerator(gl);
-    const envScene = new THREE.Scene();
-    const sphere = new THREE.Mesh(
-      new THREE.SphereGeometry(50, 32, 32),
-      new THREE.ShaderMaterial({
-        side: THREE.BackSide,
-        vertexShader: `varying vec3 vWorld; void main() { vWorld = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-        fragmentShader: `
-          varying vec3 vWorld;
-          void main() {
-            vec3 n = normalize(vWorld);
-            float v = n.y * 0.5 + 0.5;
-            vec3 c = mix(vec3(0.0), vec3(0.18, 0.0, 0.0), smoothstep(0.0, 0.5, v));
-            c += vec3(0.5, 0.04, 0.04) * pow(1.0 - abs(n.y), 3.0) * 0.5;
-            gl_FragColor = vec4(c, 1.0);
-          }
-        `,
-      })
-    );
-    envScene.add(sphere);
-    // bright red light from above
-    const top = new THREE.Mesh(
-      new THREE.SphereGeometry(2, 16, 16),
-      new THREE.MeshBasicMaterial({ color: new THREE.Color(12, 2, 2) })
-    );
-    top.position.set(0, 8, 0);
-    envScene.add(top);
-    // side lights
-    const side = new THREE.Mesh(
-      new THREE.SphereGeometry(1.5, 16, 16),
-      new THREE.MeshBasicMaterial({ color: new THREE.Color(6, 6, 8) })
-    );
-    side.position.set(5, 0, 2);
-    envScene.add(side);
-    const rt = pmrem.fromScene(envScene, 0.04);
-    pmrem.dispose();
-    return rt.texture;
-  }, [gl]);
+  const envTex = useMemo(() => getSharedEnvMap(gl), [gl]);
 
   // Carbonation bubbles - activated in phase 3
   const bubbles = useMemo(() => {
@@ -369,7 +359,6 @@ function Bottle({ phase, temp }: { phase: Phase; temp: number }) {
   }, []);
 
   // Condensation droplets - grow with cooling
-  const quality = useMemo(() => getQualitySettings(), []);
   const droplets = useMemo(() => {
     const count = Math.floor(400 * quality.particlesMultiplier);
     const data: { theta: number; y: number; scale: number; speed: number; phase: number }[] = [];
@@ -388,6 +377,7 @@ function Bottle({ phase, temp }: { phase: Phase; temp: number }) {
   const bubbleMeshRef = useRef<THREE.Points>(null);
   const dropMeshRef = useRef<THREE.InstancedMesh>(null);
   const dummy = useMemo(() => new THREE.Object3D(), []);
+  const updateAcc = useRef(0);
 
   // Drive animation
   useFrame((state, delta) => {
@@ -401,24 +391,31 @@ function Bottle({ phase, temp }: { phase: Phase; temp: number }) {
       groupRef.current.scale.z = groupRef.current.scale.x;
     }
 
-    // Bubbles - active in phase 3+
+    // Bubbles - active in phase 3+ (throttled to 30fps on low-end)
     if (bubbleMeshRef.current) {
-      const pos = bubbleMeshRef.current.geometry.attributes.position.array as Float32Array;
+      const q = getQualitySettings();
+      const updateEvery = q.tier === 'low' ? 2 : 1;
+      updateAcc.current += delta;
       const active = phase === 3 || phase === 4 || phase === 5;
-      for (let i = 0; i < bubbles.count; i++) {
-        if (active) {
-          pos[i * 3 + 1] += bubbles.speeds[i] * 60 * delta;
-          if (pos[i * 3 + 1] > 1.3) {
-            const theta = Math.random() * Math.PI * 2;
-            const y = -1.4;
-            const maxR = 0.4;
-            pos[i * 3] = Math.cos(theta) * Math.sqrt(Math.random()) * maxR;
-            pos[i * 3 + 1] = y;
-            pos[i * 3 + 2] = Math.sin(theta) * Math.sqrt(Math.random()) * maxR;
+      if (updateAcc.current >= 1 / 60 * updateEvery) {
+        const dt = updateAcc.current;
+        updateAcc.current = 0;
+        const pos = bubbleMeshRef.current.geometry.attributes.position.array as Float32Array;
+        for (let i = 0; i < bubbles.count; i++) {
+          if (active) {
+            pos[i * 3 + 1] += bubbles.speeds[i] * 60 * dt;
+            if (pos[i * 3 + 1] > 1.3) {
+              const theta = Math.random() * Math.PI * 2;
+              const y = -1.4;
+              const maxR = 0.4;
+              pos[i * 3] = Math.cos(theta) * Math.sqrt(Math.random()) * maxR;
+              pos[i * 3 + 1] = y;
+              pos[i * 3 + 2] = Math.sin(theta) * Math.sqrt(Math.random()) * maxR;
+            }
           }
         }
+        bubbleMeshRef.current.geometry.attributes.position.needsUpdate = true;
       }
-      bubbleMeshRef.current.geometry.attributes.position.needsUpdate = true;
       (bubbleMeshRef.current.material as THREE.PointsMaterial).opacity = active
         ? Math.min(0.95, ((bubbleMeshRef.current.material as THREE.PointsMaterial).opacity || 0) + 0.02)
         : 0;
@@ -613,7 +610,7 @@ function VolumetricBeam({ phase }: { phase: Phase }) {
 function Mist({ phase }: { phase: Phase }) {
   const ref = useRef<THREE.Points>(null);
   const quality = useMemo(() => getQualitySettings(), []);
-  const count = Math.floor(400 * quality.particlesMultiplier);
+  const count = Math.floor(200 * quality.particlesMultiplier);
   const data = useMemo(() => {
     const positions = new Float32Array(count * 3);
     const offsets = new Float32Array(count);
@@ -725,7 +722,8 @@ function Droplets({ phase }: { phase: Phase }) {
    ICE PARTICLES — small frozen crystals
    ============================================================ */
 function IceParticles({ phase, temp }: { phase: Phase; temp: number }) {
-  const count = 300;
+  const quality = useMemo(() => getQualitySettings(), []);
+  const count = Math.floor(200 * quality.particlesMultiplier);
   const data = useMemo(() => {
     const positions = new Float32Array(count * 3);
     const sizes = new Float32Array(count);
