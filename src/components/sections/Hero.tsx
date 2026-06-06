@@ -1,68 +1,94 @@
 'use client';
 
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense } from 'react';
 import dynamic from 'next/dynamic';
-import { motion } from 'framer-motion';
 import { Reveal } from '@/components/ui/Reveal';
 
-const HeroCan = dynamic(
-  () => import('@/components/3d/HeroCan').then((m) => m.HeroCan),
+const CanCarousel = dynamic(
+  () => import('@/components/3d/CanCarousel').then((m) => m.CanCarousel),
   { ssr: false }
 );
-const TopNav = dynamic(
-  () => import('@/components/3d/HeroCan').then((m) => m.TopNav),
-  { ssr: false }
-);
+
+function TopNav() {
+  return (
+    <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-center justify-between px-8 py-6 md:px-12">
+      <div className="pointer-events-auto flex items-center gap-3">
+        <span className="font-display text-2xl font-black italic tracking-tight text-cc-red">
+          Coca‑Cola
+        </span>
+      </div>
+      <nav className="pointer-events-auto hidden items-center gap-10 md:flex">
+        <a href="#flavors" data-hover className="text-[11px] font-semibold uppercase tracking-[0.25em] text-white/85 transition-colors hover:text-white">
+          Collection
+        </a>
+        <a href="#refresh" data-hover className="text-[11px] font-semibold uppercase tracking-[0.25em] text-white/85 transition-colors hover:text-white">
+          Experience
+        </a>
+        <a href="#legacy" data-hover className="text-[11px] font-semibold uppercase tracking-[0.25em] text-white/85 transition-colors hover:text-white">
+          History
+        </a>
+        <a href="#shop" data-hover className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-white/85 transition-colors hover:text-white">
+          Shop
+          <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </a>
+      </nav>
+      <button data-hover className="pointer-events-auto grid h-10 w-10 place-items-center rounded-full border border-white/30 text-white transition-colors hover:border-white hover:bg-white/5">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <line x1="3" y1="6" x2="21" y2="6" />
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+      </button>
+    </div>
+  );
+}
 
 export function Hero() {
-  const sectionRef = useRef<HTMLElement>(null);
-  const [pointer, setPointer] = useState({ x: 0, y: 0 });
-
-  useEffect(() => {
-    function onMove(e: MouseEvent) {
-      setPointer({
-        x: (e.clientX / window.innerWidth - 0.5) * 2,
-        y: (e.clientY / window.innerHeight - 0.5) * 2,
-      });
-    }
-    window.addEventListener('mousemove', onMove);
-    return () => window.removeEventListener('mousemove', onMove);
-  }, []);
-
   return (
     <section
-      ref={sectionRef}
       id="hero"
-      className="relative h-screen w-full overflow-hidden bg-black"
+      className="group relative h-screen w-full overflow-hidden bg-black"
     >
-      {/* Background gradients */}
+      {/* ============== UPLOADED HERO BACKGROUND ============== */}
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_75%_50%,_rgba(230,26,39,0.18),_transparent_60%)]" />
+        {/* User-uploaded hero background image */}
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: "url('/hero-bg.jpeg')" }}
+        />
+        {/* Subtle film grain overlay */}
+        <div
+          className="absolute inset-0 opacity-[0.03] mix-blend-overlay"
+          style={{
+            backgroundImage:
+              "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")",
+          }}
+        />
       </div>
 
-      {/* 3D Can Scene - right side, large and prominent */}
+      {/* ============== CAN CAROUSEL — RIGHT SIDE ============== */}
       <div className="absolute inset-0 z-10">
-        <div className="absolute right-0 top-1/2 hidden h-[100vh] w-[65vw] -translate-y-1/2 md:block">
+        <div className="absolute right-0 top-1/2 hidden h-[100vh] w-[62vw] -translate-y-1/2 md:block">
           <Suspense fallback={null}>
-            <HeroCan pointer={pointer} />
+            <CanCarousel />
           </Suspense>
         </div>
         <div className="absolute inset-0 md:hidden">
           <Suspense fallback={null}>
-            <HeroCan pointer={pointer} />
+            <CanCarousel />
           </Suspense>
         </div>
       </div>
 
-      {/* Subtle vignette */}
-      <div className="pointer-events-none absolute inset-0 z-20 bg-[radial-gradient(ellipse_at_25%_50%,_rgba(0,0,0,0.4)_0%,_transparent_50%,_rgba(0,0,0,0.7)_95%)]" />
+      {/* Left-side readability scrim (very subtle, doesn't block bg) */}
+      <div className="pointer-events-none absolute inset-0 z-20 bg-[linear-gradient(90deg,rgba(0,0,0,0.55)_0%,rgba(0,0,0,0.20)_35%,transparent_60%)]" />
 
-      {/* Top nav overlay (always visible) */}
-      <Suspense fallback={null}>
-        <TopNav />
-      </Suspense>
+      {/* ============== TOP NAV ============== */}
+      <TopNav />
 
-      {/* Text content - left side */}
+      {/* ============== TEXT CONTENT — LEFT SIDE ============== */}
       <div className="relative z-30 flex h-full items-center">
         <div className="w-full max-w-2xl px-8 md:px-16 lg:px-20">
           <Reveal>
@@ -94,7 +120,6 @@ export function Hero() {
 
           <Reveal delay={600}>
             <div className="mt-10 flex flex-wrap items-center gap-4">
-              {/* Filled red CTA */}
               <button
                 data-hover
                 className="group relative inline-flex items-center gap-3 overflow-hidden rounded-full bg-cc-red px-7 py-3.5 text-sm font-bold uppercase tracking-wider text-white shadow-[0_0_0_1px_rgba(255,255,255,0.05),0_20px_60px_-15px_rgba(230,26,39,0.7)] transition-all duration-500 hover:scale-[1.02] hover:bg-cc-redDark"
@@ -116,7 +141,6 @@ export function Hero() {
                 <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/30 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
               </button>
 
-              {/* Outlined CTA */}
               <button
                 data-hover
                 className="group inline-flex items-center gap-3 rounded-full border border-white/25 bg-transparent px-7 py-3.5 text-sm font-bold uppercase tracking-wider text-white transition-all duration-500 hover:border-white hover:bg-white/5"

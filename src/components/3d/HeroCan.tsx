@@ -3,10 +3,9 @@
 import { useRef, useMemo, Suspense } from 'react';
 import * as THREE from 'three';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
-import { KernelSize } from 'postprocessing';
 import { getQualitySettings } from '@/lib/performance';
 import { getSharedEnvMap } from '@/lib/envMap';
+import { SafePostFX } from './SafePostFX';
 
 /* ============================================================
    HYPER-REALISTIC COCA-COLA CAN — Commercial Quality
@@ -485,18 +484,7 @@ function HeroCanScene({ pointer }: { pointer: { x: number; y: number } }) {
       <Bubbles />
       <WetFloor />
 
-      {quality.postprocessing ? (
-        <EffectComposer multisampling={quality.antialias ? 2 : 0}>
-          <Bloom
-            intensity={0.9}
-            luminanceThreshold={0.55}
-            luminanceSmoothing={0.8}
-            mipmapBlur
-            kernelSize={KernelSize.LARGE}
-          />
-          <Vignette eskil={false} offset={0.18} darkness={0.88} />
-        </EffectComposer>
-      ) : null}
+      <SafePostFX />
     </>
   );
 }
