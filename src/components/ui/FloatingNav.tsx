@@ -21,7 +21,6 @@ export function FloatingNav() {
     { href: '#hero', label: 'Home' },
     { href: '#legacy', label: 'Legacy' },
     { href: '#products', label: 'Flavors' },
-    { href: '#refresh', label: 'Refresh' },
     { href: '#impact', label: 'Impact' },
   ];
 

@@ -37,7 +37,7 @@ export function Footer() {
           {[
             {
               t: 'Explore',
-              l: ['Home', 'Legacy', 'Flavors', 'Refresh', 'Impact'],
+              l: ['Home', 'Legacy', 'Flavors', 'Impact'],
             },
             {
               t: 'Company',

@@ -204,3 +204,20 @@ html.lenis body {
     animation-duration: 20s;
   }
 }
+
+/* =============================================================
+   Carousel drag hardening
+   - Kills the native image-ghost that browsers show while dragging
+     an <img>, so mouse-dragging the can carousel feels like a real
+     gesture rather than a file copy.
+   - Pairs with draggable={false} on the <img> tags themselves.
+   ============================================================= */
+.group\/carousel img {
+  -webkit-user-drag: none;
+  -khtml-user-drag: none;
+  -moz-user-drag: none;
+  -o-user-drag: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}

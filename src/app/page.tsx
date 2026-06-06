@@ -2,12 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { VideoIntro } from '@/components/ui/VideoIntro';
-import { Cursor } from '@/components/ui/Cursor';
 import { Hero } from '@/components/sections/Hero';
 import { MarqueeBand } from '@/components/sections/MarqueeBand';
 import { Legacy } from '@/components/sections/Legacy';
 import { Products } from '@/components/sections/Products';
-import { Refresh } from '@/components/sections/Refresh';
 import { Impact } from '@/components/sections/Impact';
 import { ShopCTA } from '@/components/sections/ShopCTA';
 import { Footer } from '@/components/sections/Footer';
@@ -39,12 +37,10 @@ export default function Home() {
       {hydrated && showIntro && !introDone && (
         <VideoIntro onComplete={handleIntroComplete} />
       )}
-      <Cursor />
       <Hero />
       <MarqueeBand />
       <Legacy />
       <Products />
-      <Refresh />
       <Impact />
       <ShopCTA />
       <Footer />

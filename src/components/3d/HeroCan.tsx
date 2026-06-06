@@ -504,9 +504,6 @@ function TopNav() {
         <a href="#flavors" data-hover className="text-[11px] font-semibold uppercase tracking-[0.25em] text-white/85 transition-colors hover:text-white">
           Collection
         </a>
-        <a href="#refresh" data-hover className="text-[11px] font-semibold uppercase tracking-[0.25em] text-white/85 transition-colors hover:text-white">
-          Experience
-        </a>
         <a href="#legacy" data-hover className="text-[11px] font-semibold uppercase tracking-[0.25em] text-white/85 transition-colors hover:text-white">
           History
         </a>

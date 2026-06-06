@@ -21,9 +21,6 @@ function TopNav() {
         <a href="#flavors" data-hover className="text-[11px] font-semibold uppercase tracking-[0.25em] text-white/85 transition-colors hover:text-white">
           Collection
         </a>
-        <a href="#refresh" data-hover className="text-[11px] font-semibold uppercase tracking-[0.25em] text-white/85 transition-colors hover:text-white">
-          Experience
-        </a>
         <a href="#legacy" data-hover className="text-[11px] font-semibold uppercase tracking-[0.25em] text-white/85 transition-colors hover:text-white">
           History
         </a>
@@ -76,8 +73,17 @@ export function Hero() {
           ============================================================ */}
       <div className="relative hidden h-full md:block">
         {/* ============== CAN CAROUSEL — RIGHT SIDE ============== */}
-        <div className="absolute inset-0 z-10">
-          <div className="absolute right-0 top-1/2 h-[100vh] w-[62vw] -translate-y-1/2">
+        {/*
+          z-30 so it sits on the SAME layer as the text column — but the
+          inner wrapper is only 62vw wide on the right, so the left half
+          of the hero (where the text lives) still receives clicks. The
+          carousel needs to be at z-30 (not z-10) to receive drag events,
+          because the readability scrim sits at z-20 below it, and the
+          text column at z-30 would otherwise win the pointer race on the
+          shared y-axis.
+        */}
+        <div className="absolute inset-0 z-30 pointer-events-none">
+          <div className="pointer-events-auto absolute right-0 top-1/2 h-[100vh] w-[62vw] -translate-y-1/2 cursor-grab">
             <Suspense fallback={null}>
               <CanCarousel />
             </Suspense>
@@ -88,8 +94,14 @@ export function Hero() {
         <div className="pointer-events-none absolute inset-0 z-20 bg-[linear-gradient(90deg,rgba(0,0,0,0.55)_0%,rgba(0,0,0,0.20)_35%,transparent_60%)]" />
 
         {/* ============== TEXT CONTENT — LEFT SIDE ============== */}
-        <div className="relative z-30 flex h-full items-center">
-          <div className="w-full max-w-2xl px-8 md:px-16 lg:px-20">
+        {/*
+          pointer-events-none on the FULL-WIDTH wrapper so the right side
+          of the hero (the carousel area) isn't blocked. The actual text
+          content re-enables pointer events on itself so buttons and
+          links remain interactive.
+        */}
+        <div className="pointer-events-none relative z-30 flex h-full items-center">
+          <div className="pointer-events-auto w-full max-w-2xl px-8 md:px-16 lg:px-20">
             <Reveal>
               <div className="mb-6 flex items-center gap-3">
                 <span className="h-px w-12 bg-cc-red" />
@@ -262,7 +274,7 @@ export function Hero() {
         </div>
 
         {/* 4. PRODUCT CAN CAROUSEL — centered, fixed-height, never overlaps text */}
-        <div className="relative z-10 mt-14 h-[42vh] min-h-[300px] w-full">
+        <div className="relative z-10 mt-14 h-[48vh] min-h-[360px] w-full">
           <Suspense fallback={null}>
             <CanCarousel compact />
           </Suspense>
